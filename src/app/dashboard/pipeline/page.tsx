@@ -9,7 +9,7 @@ import { APPLICATION_STATUSES, PRIORITY_OPTIONS } from '@/lib/constants';
 import Modal from '@/components/ui/Modal';
 import SlideDrawer from '@/components/ui/SlideDrawer';
 import {
-  LayoutGrid, List, Plus, Search, User, ChevronRight, Trash2
+  LayoutGrid, List, Plus, Search, User, ChevronRight, Trash2, Edit3, X, Save
 } from 'lucide-react';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -33,6 +33,8 @@ export default function PipelinePage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isEditingApp, setIsEditingApp] = useState(false);
+  const [editAppForm, setEditAppForm] = useState<Partial<Applicant>>({});
 
   // New application form
   const [newApplicantName, setNewApplicantName] = useState('');
@@ -150,7 +152,30 @@ export default function PipelinePage() {
 
   const openDrawer = (app: Application) => {
     setSelectedApp(app);
+    if (app.applicant) {
+      setEditAppForm(app.applicant);
+    }
+    setIsEditingApp(false);
     setDrawerOpen(true);
+  };
+
+  const saveAppEdits = async () => {
+    if (!selectedApp || !selectedApp.applicant) return;
+    
+    await supabase.from('applicants').update({
+      full_name: editAppForm.full_name,
+      email: editAppForm.email,
+      phone: editAppForm.phone,
+      nationality: editAppForm.nationality,
+    }).eq('id', selectedApp.applicant_id);
+
+    const updatedApplicant = { ...selectedApp.applicant, ...editAppForm } as Applicant;
+    const updatedApp = { ...selectedApp, applicant: updatedApplicant };
+    
+    setApplications(prev => prev.map(a => a.id === selectedApp.id ? updatedApp : a));
+    setSelectedApp(updatedApp);
+    fetchData(); // refresh applicants list dropdown
+    setIsEditingApp(false);
   };
 
   return (
@@ -379,21 +404,47 @@ export default function PipelinePage() {
       <SlideDrawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} title={selectedApp?.applicant?.full_name || ''} subtitle={`Application ${selectedApp?.applicant?.application_id || ''}`}>
         {selectedApp && (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { label: 'EMAIL', value: selectedApp.applicant?.email || '—' },
-                { label: 'PHONE', value: selectedApp.applicant?.phone || '—' },
-                { label: 'NATIONALITY', value: selectedApp.applicant?.nationality || '—' },
-                { label: 'PRIORITY', value: selectedApp.priority },
-                { label: 'PROGRAM', value: selectedApp.program?.title || selectedApp.custom_program || '—' },
-                { label: 'UNIVERSITY', value: selectedApp.program?.university?.name || selectedApp.custom_university || '—' },
-              ].map((item) => (
-                <div key={item.label}>
-                  <span className="text-[10px] uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>{item.label}</span>
-                  <p className="text-sm font-medium mt-0.5" style={{ color: 'var(--text-primary)' }}>{item.value}</p>
-                </div>
-              ))}
+            <div className="flex items-center justify-end pb-4" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+              <button
+                onClick={() => setIsEditingApp(!isEditingApp)}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors"
+                style={{ background: isEditingApp ? 'var(--bg-elevated)' : 'transparent', color: isEditingApp ? 'var(--text-primary)' : 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}
+              >
+                {isEditingApp ? <><X size={14}/> Cancel</> : <><Edit3 size={14}/> Edit Student</>}
+              </button>
             </div>
+
+            {isEditingApp ? (
+              <div className="space-y-4 animate-in fade-in">
+                <div className="space-y-3">
+                  <h4 className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: 'var(--text-muted)' }}>Student Details</h4>
+                  <input value={editAppForm.full_name || ''} onChange={(e) => setEditAppForm({...editAppForm, full_name: e.target.value})} placeholder="Full Name" className="input-field" />
+                  <input value={editAppForm.email || ''} onChange={(e) => setEditAppForm({...editAppForm, email: e.target.value})} placeholder="Email" className="input-field" />
+                  <input value={editAppForm.phone || ''} onChange={(e) => setEditAppForm({...editAppForm, phone: e.target.value})} placeholder="Phone" className="input-field" />
+                  <input value={editAppForm.nationality || ''} onChange={(e) => setEditAppForm({...editAppForm, nationality: e.target.value})} placeholder="Nationality" className="input-field" />
+                </div>
+                
+                <button onClick={saveAppEdits} className="gradient-btn w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 mt-4">
+                  <Save size={16} /> Save Changes
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 animate-in fade-in">
+                {[
+                  { label: 'EMAIL', value: selectedApp.applicant?.email || '—' },
+                  { label: 'PHONE', value: selectedApp.applicant?.phone || '—' },
+                  { label: 'NATIONALITY', value: selectedApp.applicant?.nationality || '—' },
+                  { label: 'PRIORITY', value: selectedApp.priority },
+                  { label: 'PROGRAM', value: selectedApp.program?.title || selectedApp.custom_program || '—' },
+                  { label: 'UNIVERSITY', value: selectedApp.program?.university?.name || selectedApp.custom_university || '—' },
+                ].map((item) => (
+                  <div key={item.label}>
+                    <span className="text-[10px] uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>{item.label}</span>
+                    <p className="text-sm font-medium mt-0.5" style={{ color: 'var(--text-primary)' }}>{item.value}</p>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div>
               <h4 className="text-[10px] uppercase tracking-widest font-semibold mb-3" style={{ color: 'var(--text-muted)' }}>Update Status</h4>
