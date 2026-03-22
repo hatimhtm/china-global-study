@@ -62,6 +62,8 @@ export interface Application {
   custom_program: string | null;
   status: ApplicationStatus;
   priority: 'Low' | 'Medium' | 'High';
+  payment_status: 'Unpaid' | 'Partial' | 'Paid';
+  amount_paid_cny: number;
   notes: string;
   created_at: string;
   // joined

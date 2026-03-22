@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { supabase } from '@/lib/supabase';
 import { Application, Applicant, Program, University } from '@/types';
-import { APPLICATION_STATUSES, PRIORITY_OPTIONS } from '@/lib/constants';
+import { APPLICATION_STATUSES, PRIORITY_OPTIONS, DEFAULT_MAD_RATE } from '@/lib/constants';
 import Modal from '@/components/ui/Modal';
 import SlideDrawer from '@/components/ui/SlideDrawer';
 import {
@@ -35,6 +35,8 @@ export default function PipelinePage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isEditingApp, setIsEditingApp] = useState(false);
   const [editAppForm, setEditAppForm] = useState<Partial<Applicant>>({});
+  const [isEditingPayment, setIsEditingPayment] = useState(false);
+  const [editPaymentForm, setEditPaymentForm] = useState<{ payment_status: 'Unpaid' | 'Partial' | 'Paid', amount_paid_cny: number }>({ payment_status: 'Unpaid', amount_paid_cny: 0 });
 
   // New application form
   const [newApplicantName, setNewApplicantName] = useState('');
@@ -123,6 +125,8 @@ export default function PipelinePage() {
         custom_program: isCustomUni ? customProgram : null,
         status: 'Inquiry',
         priority: 'Medium',
+        payment_status: 'Unpaid',
+        amount_paid_cny: 0,
         notes: '',
       });
 
@@ -156,7 +160,24 @@ export default function PipelinePage() {
       setEditAppForm(app.applicant);
     }
     setIsEditingApp(false);
+    setIsEditingPayment(false);
+    setEditPaymentForm({ payment_status: app.payment_status || 'Unpaid', amount_paid_cny: app.amount_paid_cny || 0 });
     setDrawerOpen(true);
+  };
+
+  const savePaymentEdits = async () => {
+    if (!selectedApp) return;
+    
+    await supabase.from('applications').update({
+      payment_status: editPaymentForm.payment_status,
+      amount_paid_cny: editPaymentForm.amount_paid_cny,
+    }).eq('id', selectedApp.id);
+
+    const updatedApp = { ...selectedApp, ...editPaymentForm } as Application;
+    
+    setApplications(prev => prev.map(a => a.id === selectedApp.id ? updatedApp : a));
+    setSelectedApp(updatedApp);
+    setIsEditingPayment(false);
   };
 
   const saveAppEdits = async () => {
@@ -446,7 +467,91 @@ export default function PipelinePage() {
               </div>
             )}
 
-            <div>
+            {/* Financial Tracking */}
+            <div className="pt-6" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: 'var(--text-muted)' }}>Financial Tracking</h4>
+                <button onClick={() => setIsEditingPayment(!isEditingPayment)} className="text-[10px] uppercase font-semibold transition-colors" style={{ color: isEditingPayment ? 'var(--text-muted)' : 'var(--accent-primary)' }}>
+                  {isEditingPayment ? 'Cancel' : 'Edit'}
+                </button>
+              </div>
+              
+              {isEditingPayment ? (
+                <div className="space-y-3 animate-in fade-in p-3 rounded-lg" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-subtle)' }}>
+                  <label className="text-[10px] uppercase tracking-widest font-semibold block mb-1" style={{ color: 'var(--text-muted)' }}>Set Payment Status</label>
+                  <div className="flex gap-2">
+                    {['Unpaid', 'Partial', 'Paid'].map(status => (
+                       <button
+                         key={status}
+                         onClick={() => setEditPaymentForm({ ...editPaymentForm, payment_status: status as 'Unpaid' | 'Partial' | 'Paid' })}
+                         className="px-3 py-1.5 rounded-lg text-xs font-semibold flex-1 transition-colors"
+                         style={{
+                           background: editPaymentForm.payment_status === status ? 'var(--accent-primary)' : 'var(--bg-elevated)',
+                           color: editPaymentForm.payment_status === status ? 'var(--text-inverse)' : 'var(--text-secondary)'
+                         }}
+                       >
+                         {status}
+                       </button>
+                    ))}
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase tracking-widest font-semibold block mb-1 mt-2" style={{ color: 'var(--text-muted)' }}>Amount Paid (CNY)</label>
+                    <input 
+                      type="number" 
+                      value={editPaymentForm.amount_paid_cny === 0 ? '' : editPaymentForm.amount_paid_cny} 
+                      onChange={(e) => setEditPaymentForm({ ...editPaymentForm, amount_paid_cny: parseInt(e.target.value) || 0 })}
+                      className="input-field" 
+                      placeholder="0" 
+                    />
+                  </div>
+                  <button onClick={savePaymentEdits} className="gradient-btn w-full py-2 rounded-lg text-xs font-semibold mt-2">
+                    Save Payment Info
+                  </button>
+                </div>
+              ) : (() => {
+                const totalFee = selectedApp.program?.total_fee_cny || 0;
+                const paid = selectedApp.amount_paid_cny || 0;
+                const left = Math.max(0, totalFee - paid);
+                const leftMad = Math.round(left * DEFAULT_MAD_RATE);
+                
+                const bgMap = { Unpaid: 'rgba(248, 113, 113, 0.12)', Partial: 'rgba(251, 191, 36, 0.12)', Paid: 'rgba(52, 211, 153, 0.12)' };
+                const colorMap = { Unpaid: '#f87171', Partial: '#fbbf24', Paid: '#34d399' };
+                const pStatus = selectedApp.payment_status || 'Unpaid';
+                
+                return (
+                  <div className="space-y-3 animate-in fade-in">
+                    <div className="flex items-center justify-between p-3 rounded-xl" style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-card)' }}>
+                       <div>
+                         <span className="text-[10px] uppercase font-bold tracking-wider" style={{ color: 'var(--text-muted)' }}>Status</span>
+                       </div>
+                       <div>
+                         <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: bgMap[pStatus as 'Unpaid' | 'Partial' | 'Paid'], color: colorMap[pStatus as 'Unpaid' | 'Partial' | 'Paid'] }}>
+                           {pStatus}
+                         </span>
+                       </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="p-3 rounded-xl text-center" style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-card)' }}>
+                        <p className="text-[10px] uppercase font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Total Fee</p>
+                        <p className="text-sm font-bold truncate">¥{totalFee.toLocaleString()}</p>
+                      </div>
+                      <div className="p-3 rounded-xl text-center" style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-card)' }}>
+                        <p className="text-[10px] uppercase font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Paid</p>
+                        <p className="text-sm font-bold truncate" style={{ color: colorMap[pStatus as 'Unpaid' | 'Partial' | 'Paid'] }}>¥{paid.toLocaleString()}</p>
+                      </div>
+                      <div className="p-3 rounded-xl text-center relative overflow-hidden" style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-hover)' }}>
+                        <p className="text-[10px] uppercase font-semibold mb-1 relative z-10" style={{ color: 'var(--accent-red)' }}>Amount Left</p>
+                        <p className="text-[13px] font-bold truncate relative z-10 leading-none mb-0.5" style={{ color: 'var(--text-primary)' }}>¥{left.toLocaleString()}</p>
+                        <p className="text-[9px] font-medium opacity-80 relative z-10" style={{ color: 'var(--text-muted)' }}>~{leftMad.toLocaleString()} MAD</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="pt-6 mt-4" style={{ borderTop: '1px solid var(--border-subtle)' }}>
               <h4 className="text-[10px] uppercase tracking-widest font-semibold mb-3" style={{ color: 'var(--text-muted)' }}>Update Status</h4>
               <div className="flex flex-wrap gap-2">
                 {APPLICATION_STATUSES.map((s) => (

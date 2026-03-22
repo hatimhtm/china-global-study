@@ -70,6 +70,8 @@ CREATE TABLE IF NOT EXISTS applications (
   custom_program TEXT,
   status TEXT DEFAULT 'Inquiry' CHECK (status IN ('Inquiry', 'Documents Collecting', 'Submitted', 'Under Review', 'Accepted', 'Visa Processing', 'Enrolled', 'Rejected')),
   priority TEXT DEFAULT 'Medium' CHECK (priority IN ('Low', 'Medium', 'High')),
+  payment_status TEXT DEFAULT 'Unpaid' CHECK (payment_status IN ('Unpaid', 'Partial', 'Paid')),
+  amount_paid_cny INTEGER DEFAULT 0,
   notes TEXT DEFAULT '',
   status_updated_at TIMESTAMPTZ DEFAULT NOW(),
   created_at TIMESTAMPTZ DEFAULT NOW()
@@ -162,3 +164,7 @@ CREATE POLICY "Allow all for anon" ON settings FOR ALL USING (true) WITH CHECK (
 -- ============================================
 -- DONE! Your database is now ready.
 -- ============================================
+
+-- If you are updating an existing database, run these commands:
+-- ALTER TABLE applications ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'Unpaid' CHECK (payment_status IN ('Unpaid', 'Partial', 'Paid'));
+-- ALTER TABLE applications ADD COLUMN IF NOT EXISTS amount_paid_cny INTEGER DEFAULT 0;
