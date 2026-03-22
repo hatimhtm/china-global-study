@@ -36,7 +36,7 @@ export default function PipelinePage() {
   const [isEditingApp, setIsEditingApp] = useState(false);
   const [editAppForm, setEditAppForm] = useState<Partial<Applicant>>({});
   const [isEditingPayment, setIsEditingPayment] = useState(false);
-  const [editPaymentForm, setEditPaymentForm] = useState<{ payment_status: 'Unpaid' | 'Partial' | 'Paid', amount_paid_cny: number }>({ payment_status: 'Unpaid', amount_paid_cny: 0 });
+  const [addPaymentAmount, setAddPaymentAmount] = useState<number | ''>('');
 
   // New application form
   const [newApplicantName, setNewApplicantName] = useState('');
@@ -161,23 +161,39 @@ export default function PipelinePage() {
     }
     setIsEditingApp(false);
     setIsEditingPayment(false);
-    setEditPaymentForm({ payment_status: app.payment_status || 'Unpaid', amount_paid_cny: app.amount_paid_cny || 0 });
+    setAddPaymentAmount('');
     setDrawerOpen(true);
   };
 
-  const savePaymentEdits = async () => {
+  const savePayment = async () => {
     if (!selectedApp) return;
     
+    const amountToAdd = Number(addPaymentAmount) || 0;
+    if (amountToAdd <= 0) {
+      setIsEditingPayment(false);
+      return;
+    }
+
+    const currentPaid = selectedApp.amount_paid_cny || 0;
+    const totalFee = selectedApp.program?.total_fee_cny || 0;
+    const newTotal = currentPaid + amountToAdd;
+    
+    let newStatus = 'Unpaid';
+    if (newTotal > 0 && newTotal < totalFee) newStatus = 'Partial';
+    if (newTotal >= totalFee && totalFee > 0) newStatus = 'Paid';
+    if (newTotal > 0 && totalFee === 0) newStatus = 'Paid';
+    
     await supabase.from('applications').update({
-      payment_status: editPaymentForm.payment_status,
-      amount_paid_cny: editPaymentForm.amount_paid_cny,
+      payment_status: newStatus,
+      amount_paid_cny: newTotal,
     }).eq('id', selectedApp.id);
 
-    const updatedApp = { ...selectedApp, ...editPaymentForm } as Application;
+    const updatedApp = { ...selectedApp, payment_status: newStatus, amount_paid_cny: newTotal } as Application;
     
     setApplications(prev => prev.map(a => a.id === selectedApp.id ? updatedApp : a));
     setSelectedApp(updatedApp);
     setIsEditingPayment(false);
+    setAddPaymentAmount('');
   };
 
   const saveAppEdits = async () => {
@@ -285,8 +301,8 @@ export default function PipelinePage() {
                                     {app.program?.university?.name || app.custom_university || ''}
                                   </p>
                                   <div className="flex items-center justify-between mt-2">
-                                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full priority-${app.priority.toLowerCase()}`}>
-                                      {app.priority}
+                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: app.payment_status === 'Paid' ? 'rgba(52, 211, 153, 0.12)' : app.payment_status === 'Partial' ? 'rgba(251, 191, 36, 0.12)' : 'rgba(248, 113, 113, 0.12)', color: app.payment_status === 'Paid' ? '#34d399' : app.payment_status === 'Partial' ? '#fbbf24' : '#f87171' }}>
+                                      {app.payment_status || 'Unpaid'}
                                     </span>
                                     <ChevronRight size={12} style={{ color: 'var(--text-muted)' }} />
                                   </div>
@@ -310,7 +326,7 @@ export default function PipelinePage() {
           <table className="w-full">
             <thead>
               <tr style={{ background: 'var(--bg-elevated)' }}>
-                {['Applicant', 'Program', 'University', 'Status', 'Priority', 'Date'].map((h) => (
+                {['Applicant', 'Program', 'University', 'Status', 'Payment', 'Date'].map((h) => (
                   <th key={h} className="text-left px-4 py-3 text-[10px] uppercase tracking-widest font-semibold" style={{ color: 'var(--text-muted)' }}>{h}</th>
                 ))}
               </tr>
@@ -322,7 +338,7 @@ export default function PipelinePage() {
                   <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-secondary)' }}>{app.program?.title || app.custom_program || '—'}</td>
                   <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-secondary)' }}>{app.program?.university?.name || app.custom_university || '—'}</td>
                   <td className="px-4 py-3"><span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: `${STATUS_COLORS[app.status]}20`, color: STATUS_COLORS[app.status] }}>{app.status}</span></td>
-                  <td className="px-4 py-3"><span className={`text-[10px] font-medium px-2 py-0.5 rounded-full priority-${app.priority.toLowerCase()}`}>{app.priority}</span></td>
+                  <td className="px-4 py-3"><span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: app.payment_status === 'Paid' ? 'rgba(52, 211, 153, 0.12)' : app.payment_status === 'Partial' ? 'rgba(251, 191, 36, 0.12)' : 'rgba(248, 113, 113, 0.12)', color: app.payment_status === 'Paid' ? '#34d399' : app.payment_status === 'Partial' ? '#fbbf24' : '#f87171' }}>{app.payment_status || 'Unpaid'}</span></td>
                   <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-muted)' }}>{new Date(app.created_at).toLocaleDateString()}</td>
                 </tr>
               ))}
@@ -455,7 +471,7 @@ export default function PipelinePage() {
                   { label: 'EMAIL', value: selectedApp.applicant?.email || '—' },
                   { label: 'PHONE', value: selectedApp.applicant?.phone || '—' },
                   { label: 'NATIONALITY', value: selectedApp.applicant?.nationality || '—' },
-                  { label: 'PRIORITY', value: selectedApp.priority },
+                  { label: 'PAYMENT', value: selectedApp.payment_status || 'Unpaid' },
                   { label: 'PROGRAM', value: selectedApp.program?.title || selectedApp.custom_program || '—' },
                   { label: 'UNIVERSITY', value: selectedApp.program?.university?.name || selectedApp.custom_university || '—' },
                 ].map((item) => (
@@ -478,34 +494,18 @@ export default function PipelinePage() {
               
               {isEditingPayment ? (
                 <div className="space-y-3 animate-in fade-in p-3 rounded-lg" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-subtle)' }}>
-                  <label className="text-[10px] uppercase tracking-widest font-semibold block mb-1" style={{ color: 'var(--text-muted)' }}>Set Payment Status</label>
-                  <div className="flex gap-2">
-                    {['Unpaid', 'Partial', 'Paid'].map(status => (
-                       <button
-                         key={status}
-                         onClick={() => setEditPaymentForm({ ...editPaymentForm, payment_status: status as 'Unpaid' | 'Partial' | 'Paid' })}
-                         className="px-3 py-1.5 rounded-lg text-xs font-semibold flex-1 transition-colors"
-                         style={{
-                           background: editPaymentForm.payment_status === status ? 'var(--accent-primary)' : 'var(--bg-elevated)',
-                           color: editPaymentForm.payment_status === status ? 'var(--text-inverse)' : 'var(--text-secondary)'
-                         }}
-                       >
-                         {status}
-                       </button>
-                    ))}
-                  </div>
                   <div>
-                    <label className="text-[10px] uppercase tracking-widest font-semibold block mb-1 mt-2" style={{ color: 'var(--text-muted)' }}>Amount Paid (CNY)</label>
+                    <label className="text-[10px] uppercase tracking-widest font-semibold block mb-1" style={{ color: 'var(--text-muted)' }}>Add Payment (CNY)</label>
                     <input 
                       type="number" 
-                      value={editPaymentForm.amount_paid_cny === 0 ? '' : editPaymentForm.amount_paid_cny} 
-                      onChange={(e) => setEditPaymentForm({ ...editPaymentForm, amount_paid_cny: parseInt(e.target.value) || 0 })}
+                      value={addPaymentAmount} 
+                      onChange={(e) => setAddPaymentAmount(parseInt(e.target.value) || '')}
                       className="input-field" 
-                      placeholder="0" 
+                      placeholder="Amount to add to current balance (e.g. 500)" 
                     />
                   </div>
-                  <button onClick={savePaymentEdits} className="gradient-btn w-full py-2 rounded-lg text-xs font-semibold mt-2">
-                    Save Payment Info
+                  <button onClick={savePayment} disabled={!addPaymentAmount} className="gradient-btn w-full py-2 rounded-lg text-xs font-semibold mt-2 disabled:opacity-50">
+                    Add Payment
                   </button>
                 </div>
               ) : (() => {
@@ -571,29 +571,6 @@ export default function PipelinePage() {
                     }}
                   >
                     {s}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <h4 className="text-[10px] uppercase tracking-widest font-semibold mb-3" style={{ color: 'var(--text-muted)' }}>Update Priority</h4>
-              <div className="flex gap-2">
-                {PRIORITY_OPTIONS.map((pr) => (
-                  <button
-                    key={pr}
-                    onClick={async () => {
-                      await supabase.from('applications').update({ priority: pr }).eq('id', selectedApp.id);
-                      setApplications(prev => prev.map(a => a.id === selectedApp.id ? { ...a, priority: pr } : a));
-                      setSelectedApp({ ...selectedApp, priority: pr });
-                    }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105 priority-${pr.toLowerCase()}`}
-                    style={{
-                      outline: selectedApp.priority === pr ? '2px solid var(--accent-primary)' : 'none',
-                      outlineOffset: '2px',
-                    }}
-                  >
-                    {pr}
                   </button>
                 ))}
               </div>

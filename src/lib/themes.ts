@@ -1,4 +1,4 @@
-export type ThemeKey = 'obsidian' | 'cream' | 'sapphire' | 'jade';
+export type ThemeKey = 'obsidian' | 'cream' | 'sapphire' | 'jade' | 'orange';
 
 export interface ThemeDefinition {
   key: ThemeKey;
@@ -143,6 +143,40 @@ export const themes: Record<ThemeKey, ThemeDefinition> = {
       '--shadow-color': 'rgba(0, 0, 0, 0.5)',
       '--badge-bg': 'rgba(52, 211, 153, 0.15)',
       '--badge-text': '#34d399',
+    },
+  },
+  orange: {
+    key: 'orange',
+    name: 'Vivid Orange',
+    description: 'Deep black with fiery accents',
+    icon: '🔥',
+    colors: {
+      '--bg-primary': '#0e0e0e',
+      '--bg-secondary': '#131313',
+      '--bg-card': '#191a1a',
+      '--bg-elevated': '#252626',
+      '--bg-hover': '#2a2b2b',
+      '--bg-input': '#1a1a1a',
+      '--bg-sidebar': '#0a0a0a',
+      '--text-primary': '#ffffff',
+      '--text-secondary': '#acabaa',
+      '--text-muted': '#6b6a69',
+      '--text-inverse': '#0e0e0e',
+      '--accent-primary': '#f97316',
+      '--accent-gradient-from': '#f97316',
+      '--accent-gradient-to': '#ea580c',
+      '--accent-green': '#34d399',
+      '--accent-blue': '#60a5fa',
+      '--accent-amber': '#fbbf24',
+      '--accent-red': '#f87171',
+      '--accent-purple': '#a78bfa',
+      '--border-subtle': 'rgba(249, 115, 22, 0.15)',
+      '--border-medium': 'rgba(249, 115, 22, 0.3)',
+      '--glass-bg': 'rgba(37, 38, 38, 0.75)',
+      '--glass-border': 'rgba(249, 115, 22, 0.08)',
+      '--shadow-color': 'rgba(0, 0, 0, 0.4)',
+      '--badge-bg': 'rgba(249, 115, 22, 0.15)',
+      '--badge-text': '#f97316',
     },
   },
 };
