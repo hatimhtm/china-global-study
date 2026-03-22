@@ -48,10 +48,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="min-h-screen" style={{ background: 'var(--bg-primary)' }}>
       <Sidebar onNewEntry={() => setShowNewEntry(true)} />
 
-      <div className="ml-56">
+      <div style={{ marginLeft: '220px' }}>
         <Navbar searchQuery={searchQuery} onSearchChange={setSearchQuery} />
 
-        <main className="p-6">
+        <main className="p-6 pb-12">
           {children}
         </main>
       </div>
