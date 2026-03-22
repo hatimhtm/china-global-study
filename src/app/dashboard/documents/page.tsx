@@ -7,7 +7,7 @@ import { Document, Application, Applicant } from '@/types';
 import { DOCUMENT_TYPES } from '@/lib/constants';
 import Modal from '@/components/ui/Modal';
 import {
-  FileText, User, Search, Plus, Filter, CheckCircle, Clock, AlertCircle, XCircle,
+  FileText, User, Search, Plus, Filter, CheckCircle, Clock, AlertCircle, XCircle, Trash2
 } from 'lucide-react';
 
 const STATUS_ICON: Record<string, typeof CheckCircle> = {
@@ -79,6 +79,13 @@ export default function DocumentsPage() {
     setNewDocType('Passport');
     setNewDocLabel('');
     setNewDocAppId('');
+    fetchData();
+  };
+
+  const deleteDocument = async (e: React.MouseEvent, docId: string) => {
+    e.stopPropagation();
+    if (!confirm('Are you sure you want to delete this document?')) return;
+    await supabase.from('documents').delete().eq('id', docId);
     fetchData();
   };
 
@@ -158,6 +165,12 @@ export default function DocumentsPage() {
                           <p className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>{doc.label || doc.document_type}</p>
                           <span className={`text-[10px] font-semibold uppercase status-${doc.status.toLowerCase()}`}>{doc.status}</span>
                         </div>
+                        <button
+                          onClick={(e) => deleteDocument(e, doc.id)}
+                          className="p-1.5 rounded hover:bg-red-500/10 transition-colors ml-auto group"
+                        >
+                          <Trash2 size={14} className="opacity-40 group-hover:opacity-100 transition-opacity" style={{ color: 'var(--accent-red)' }} />
+                        </button>
                       </div>
                     );
                   })}

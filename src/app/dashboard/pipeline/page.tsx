@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { Application, Applicant, Program, University } from '@/types';
 import { APPLICATION_STATUSES, PRIORITY_OPTIONS } from '@/lib/constants';
 import Modal from '@/components/ui/Modal';
 import SlideDrawer from '@/components/ui/SlideDrawer';
 import {
-  LayoutGrid, List, Plus, Search, User, GraduationCap, ChevronRight, GripVertical,
+  LayoutGrid, List, Plus, Search, User, GraduationCap, ChevronRight, GripVertical, Trash2
 } from 'lucide-react';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -115,6 +115,21 @@ export default function PipelinePage() {
     }
   };
 
+  const deleteApplication = async (appId: string, applicantId: string) => {
+    if (!confirm('Are you sure you want to delete this application? \n\nClicking OK will permanently delete this student record.')) return;
+    
+    // As per user request, deleting the application shouldn't just delete the application,
+    // it should basically delete the student "so it is never brought up again".
+    // We start by deleting the applicant. Since foreign keys are defined typically with cascade or restrict,
+    // explicitly deleting both is safer. First applications, then applicant.
+    await supabase.from('applications').delete().eq('id', appId);
+    await supabase.from('applicants').delete().eq('id', applicantId);
+    
+    setDrawerOpen(false);
+    setSelectedApp(null);
+    fetchData();
+  };
+
   const resetForm = () => {
     setNewApplicantName(''); setNewApplicantEmail(''); setNewApplicantPhone('');
     setNewApplicantNationality(''); setSelectedProgramId(''); setCustomUniversity('');
@@ -155,6 +170,7 @@ export default function PipelinePage() {
         </div>
       ) : view === 'kanban' ? (
         /* ===== KANBAN ===== */
+        // Stretch the min-height to fill remaining vertical window height space
         <div className="flex gap-4 overflow-x-auto pb-4">
           {APPLICATION_STATUSES.map((status) => {
             const items = applications.filter((a) => a.status === status);
@@ -167,7 +183,7 @@ export default function PipelinePage() {
                     {items.length}
                   </span>
                 </div>
-                <div className="space-y-2 min-h-[200px] p-2 rounded-xl" style={{ background: 'var(--bg-secondary)' }}>
+                <div className="space-y-2 min-h-[calc(100vh-220px)] p-2 rounded-xl" style={{ background: 'var(--bg-secondary)', border: '1px dashed var(--border-subtle)' }}>
                   {items.map((app) => (
                     <motion.div
                       key={app.id}
@@ -193,7 +209,7 @@ export default function PipelinePage() {
                         <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full priority-${app.priority.toLowerCase()}`}>
                           {app.priority}
                         </span>
-                        <ChevronRight size={12} style={{ color: 'var(--text-muted)' }} />
+                        <ChevronRight size={12} style={{ color: 'var(--text-muted)' }} className="group-hover:translate-x-1 transition-transform" />
                       </div>
                     </motion.div>
                   ))}
@@ -235,73 +251,87 @@ export default function PipelinePage() {
           {/* Applicant */}
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <button onClick={() => setIsNewApplicant(true)} className="text-xs font-medium px-3 py-1 rounded-full" style={{ background: isNewApplicant ? 'var(--accent-primary)' : 'var(--bg-card)', color: isNewApplicant ? 'var(--text-inverse)' : 'var(--text-secondary)' }}>
+              <button onClick={() => setIsNewApplicant(true)} className="text-xs font-medium px-3 py-1 rounded-full transition-colors" style={{ background: isNewApplicant ? 'var(--accent-primary)' : 'var(--bg-card)', color: isNewApplicant ? 'var(--text-inverse)' : 'var(--text-secondary)' }}>
                 New Student
               </button>
-              <button onClick={() => setIsNewApplicant(false)} className="text-xs font-medium px-3 py-1 rounded-full" style={{ background: !isNewApplicant ? 'var(--accent-primary)' : 'var(--bg-card)', color: !isNewApplicant ? 'var(--text-inverse)' : 'var(--text-secondary)' }}>
+              <button onClick={() => setIsNewApplicant(false)} className="text-xs font-medium px-3 py-1 rounded-full transition-colors" style={{ background: !isNewApplicant ? 'var(--accent-primary)' : 'var(--bg-card)', color: !isNewApplicant ? 'var(--text-inverse)' : 'var(--text-secondary)' }}>
                 Existing Student
               </button>
             </div>
             {isNewApplicant ? (
-              <div className="grid grid-cols-2 gap-3">
-                <input placeholder="Full name" value={newApplicantName} onChange={(e) => setNewApplicantName(e.target.value)} className="input-field" />
-                <input placeholder="Email" value={newApplicantEmail} onChange={(e) => setNewApplicantEmail(e.target.value)} className="input-field" />
-                <input placeholder="Phone" value={newApplicantPhone} onChange={(e) => setNewApplicantPhone(e.target.value)} className="input-field" />
-                <input placeholder="Nationality" value={newApplicantNationality} onChange={(e) => setNewApplicantNationality(e.target.value)} className="input-field" />
+              <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)' }}>
+                <input placeholder="Full name *" value={newApplicantName} onChange={(e) => setNewApplicantName(e.target.value)} className="input-field" autoFocus />
+                <div className="grid grid-cols-2 gap-3">
+                   <input placeholder="Email (optional)" value={newApplicantEmail} onChange={(e) => setNewApplicantEmail(e.target.value)} className="input-field" />
+                   <input placeholder="Phone (optional)" value={newApplicantPhone} onChange={(e) => setNewApplicantPhone(e.target.value)} className="input-field" />
+                   <input placeholder="Nationality (optional)" value={newApplicantNationality} onChange={(e) => setNewApplicantNationality(e.target.value)} className="input-field col-span-2" />
+                </div>
               </div>
             ) : (
-              <select value={selectedApplicantId} onChange={(e) => setSelectedApplicantId(e.target.value)} className="input-field">
-                <option value="">Select student...</option>
-                {applicants.map((a) => <option key={a.id} value={a.id}>{a.full_name}</option>)}
-              </select>
+              <div className="p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)' }}>
+                <select value={selectedApplicantId} onChange={(e) => setSelectedApplicantId(e.target.value)} className="input-field">
+                  <option value="">Select student...</option>
+                  {applicants.map((a) => <option key={a.id} value={a.id}>{a.full_name}</option>)}
+                </select>
+              </div>
             )}
           </div>
 
           {/* Program selection */}
-          <div>
-            <label className="text-[10px] uppercase tracking-widest font-semibold mb-2 block" style={{ color: 'var(--text-muted)' }}>Program</label>
+          <div className="p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)' }}>
+            <label className="text-[10px] uppercase tracking-widest font-semibold mb-3 block" style={{ color: 'var(--text-muted)' }}>Program Allocation</label>
             {!isCustomUni ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div className="relative">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
-                  <input value={programSearch} onChange={(e) => setProgramSearch(e.target.value)} placeholder="Type to search programs or universities..." className="input-field pl-9" />
+                  <input value={programSearch} onChange={(e) => setProgramSearch(e.target.value)} placeholder="Type to search existing programs..." className="input-field pl-10" />
                 </div>
                 {programSearch && (
-                  <div className="max-h-40 overflow-y-auto rounded-lg" style={{ background: 'var(--bg-card)' }}>
+                  <div className="max-h-40 overflow-y-auto rounded-lg" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-subtle)' }}>
                     {filteredPrograms.map((p) => (
                       <div
                         key={p.id}
                         onClick={() => { setSelectedProgramId(p.id); setProgramSearch(`${p.title} — ${p.university?.name}`); }}
-                        className="px-3 py-2 cursor-pointer text-xs transition-colors"
+                        className="px-3 py-2 cursor-pointer text-xs transition-colors hover:bg-white/5"
                         style={{ color: selectedProgramId === p.id ? 'var(--accent-primary)' : 'var(--text-secondary)', background: selectedProgramId === p.id ? 'var(--bg-elevated)' : 'transparent' }}
                       >
                         <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{p.title}</span>
                         <span className="ml-2" style={{ color: 'var(--text-muted)' }}>— {p.university?.name}</span>
                       </div>
                     ))}
+                    {filteredPrograms.length === 0 && <div className="p-3 text-xs text-center text-muted">No programs found</div>}
                   </div>
                 )}
-                <button onClick={() => setIsCustomUni(true)} className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>
-                  + Use a non-partnered university
+                <button type="button" onClick={() => setIsCustomUni(true)} className="text-xs font-medium" style={{ color: 'var(--accent-green)' }}>
+                  + Manual entry for non-partnered university
                 </button>
               </div>
             ) : (
-              <div className="space-y-3 p-3 rounded-xl" style={{ background: 'var(--bg-card)' }}>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Non-Partnered University</span>
-                  <button onClick={() => setIsCustomUni(false)} className="text-xs" style={{ color: 'var(--accent-red)' }}>Cancel</button>
+              <div className="space-y-3 p-3 rounded-lg" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-subtle)' }}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Non-Partnered Record</span>
+                  <button type="button" onClick={() => setIsCustomUni(false)} className="text-xs transition-colors hover:text-red-400" style={{ color: 'var(--accent-red)' }}>Cancel</button>
                 </div>
-                <input placeholder="University name" value={customUniversity} onChange={(e) => setCustomUniversity(e.target.value)} className="input-field" />
+                <input placeholder="University name" value={customUniversity} onChange={(e) => setCustomUniversity(e.target.value)} className="input-field" autoFocus />
                 <input placeholder="Program name" value={customProgram} onChange={(e) => setCustomProgram(e.target.value)} className="input-field" />
               </div>
             )}
           </div>
 
-          <div className="flex justify-end gap-3">
-            <button onClick={() => { setShowAddModal(false); resetForm(); }} className="px-4 py-2 rounded-xl text-sm" style={{ color: 'var(--text-secondary)' }}>Cancel</button>
-            <button onClick={addApplication} disabled={(!isNewApplicant && !selectedApplicantId) || (isNewApplicant && !newApplicantName)} className="gradient-btn px-6 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50">
-              Create Application
-            </button>
+          <div className="flex justify-between pt-2">
+            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+              * = required
+            </span>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => { setShowAddModal(false); resetForm(); }} className="px-4 py-2 rounded-xl text-sm transition-colors hover:text-white" style={{ color: 'var(--text-secondary)' }}>Cancel</button>
+              <button 
+                onClick={addApplication} 
+                disabled={(!isNewApplicant && !selectedApplicantId) || (isNewApplicant && !newApplicantName) || (!isCustomUni && !selectedProgramId && !isNewApplicant)} 
+                className="gradient-btn px-6 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50"
+              >
+                Create Application
+              </button>
+            </div>
           </div>
         </div>
       </Modal>
@@ -333,7 +363,7 @@ export default function PipelinePage() {
                   <button
                     key={s}
                     onClick={() => updateStatus(selectedApp.id, s)}
-                    className="px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all"
+                    className="px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all hover:scale-105"
                     style={{
                       background: `${STATUS_COLORS[s]}20`,
                       color: STATUS_COLORS[s],
@@ -358,7 +388,7 @@ export default function PipelinePage() {
                       fetchData();
                       setSelectedApp({ ...selectedApp, priority: pr });
                     }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium priority-${pr.toLowerCase()}`}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105 priority-${pr.toLowerCase()}`}
                     style={{
                       outline: selectedApp.priority === pr ? '2px solid var(--accent-primary)' : 'none',
                       outlineOffset: '2px',
@@ -368,6 +398,20 @@ export default function PipelinePage() {
                   </button>
                 ))}
               </div>
+            </div>
+            
+            {/* Actions */}
+            <div className="pt-6 mt-4" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+               <button
+                  onClick={() => deleteApplication(selectedApp.id, selectedApp.applicant_id)}
+                  className="px-4 py-2 w-full rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 transition-colors hover:bg-red-500/10"
+                  style={{ color: 'var(--accent-red)', border: '1px solid rgba(248, 113, 113, 0.3)' }}
+                >
+                  <Trash2 size={14} /> Delete Student Record
+                </button>
+                <p className="text-center text-[10px] mt-2" style={{ color: 'var(--text-muted)' }}>
+                  This will permanently delete the student and their application.
+                </p>
             </div>
           </div>
         )}

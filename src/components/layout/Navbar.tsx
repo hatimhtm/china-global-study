@@ -23,14 +23,14 @@ export default function Navbar({ searchQuery, onSearchChange }: NavbarProps) {
       <div className="flex items-center gap-3">
         <div className="relative">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search programs..."
-            className="input-field pl-9 py-1.5 text-xs w-64"
-            style={{ background: 'var(--bg-input)' }}
-          />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder="Search programs..."
+              className="input-field pl-10 py-1.5 text-xs w-64"
+              style={{ background: 'var(--bg-input)' }}
+            />
         </div>
         <button className="p-2 rounded-lg transition-colors" style={{ color: 'var(--text-muted)' }}>
           <Bell size={18} />

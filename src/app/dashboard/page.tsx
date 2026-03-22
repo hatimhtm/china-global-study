@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { Program, University } from '@/types';
-import { DEFAULT_MAD_RATE } from '@/lib/constants';
+import { DEFAULT_MAD_RATE, DEGREE_LEVELS, INTAKE_SEASONS } from '@/lib/constants';
 import SlideDrawer from '@/components/ui/SlideDrawer';
 import {
   LayoutGrid,
@@ -20,6 +20,8 @@ import {
   Star,
   Edit3,
   Trash2,
+  X,
+  Save,
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -28,14 +30,16 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [selectedProgram, setSelectedProgram] = useState<(Program & { university: University }) | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   // Filters
   const [cityFilter, setCityFilter] = useState('');
   const [degreeFilter, setDegreeFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Edit mode in drawer
-  const [editStatus, setEditStatus] = useState('');
+  // Edit state
+  const [editForm, setEditForm] = useState<Partial<Program>>({});
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const fetchPrograms = useCallback(async () => {
     setLoading(true);
@@ -83,7 +87,8 @@ export default function DashboardPage() {
 
   const openDrawer = (program: Program & { university: University }) => {
     setSelectedProgram(program);
-    setEditStatus(program.status);
+    setEditForm(program);
+    setIsEditing(false);
     setDrawerOpen(true);
   };
 
@@ -95,12 +100,48 @@ export default function DashboardPage() {
     }
   };
 
+  const saveProgramEdits = async () => {
+    if (!selectedProgram) return;
+    setSavingEdit(true);
+    
+    // Auto calculate totals
+    const totalCny = (Number(editForm.tuition_cny) || 0) + (Number(editForm.dorm_fee_cny) || 0) + (Number(editForm.service_fee_cny) || 0);
+    const totalMad = Math.round(totalCny * DEFAULT_MAD_RATE * 100) / 100;
+
+    const updates = {
+      ...editForm,
+      total_fee_cny: totalCny,
+      total_fee_mad: totalMad,
+    };
+
+    // Remove joined university data before saving
+    delete (updates as any).university;
+
+    const { data, error } = await supabase
+      .from('programs')
+      .update(updates)
+      .eq('id', selectedProgram.id)
+      .select('*, university:universities(*)')
+      .single();
+
+    if (data) {
+      setSelectedProgram(data as (Program & { university: University }));
+      fetchPrograms();
+      setIsEditing(false);
+    }
+    setSavingEdit(false);
+  };
+
   const deleteProgram = async (id: string) => {
     if (!confirm('Are you sure you want to delete this program offer?')) return;
     await supabase.from('programs').delete().eq('id', id);
     setDrawerOpen(false);
     setSelectedProgram(null);
     fetchPrograms();
+  };
+
+  const handleEditChange = (field: keyof Program, value: any) => {
+    setEditForm((prev) => ({ ...prev, [field]: value }));
   };
 
   return (
@@ -154,7 +195,7 @@ export default function DashboardPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search programs..."
-              className="input-field pl-9 py-2 text-xs w-52"
+              className="input-field pl-10 py-2 text-xs w-52"
             />
           </div>
           <select value={cityFilter} onChange={(e) => setCityFilter(e.target.value)} className="input-field py-2 text-xs w-36">
@@ -327,109 +368,168 @@ export default function DashboardPage() {
       >
         {selectedProgram && (
           <div className="space-y-6">
-            {/* Status badge */}
-            <div className="flex items-center gap-2">
-              <div className="pulse-dot" />
-              <span className={`text-xs font-semibold uppercase px-2 py-0.5 rounded-full status-${selectedProgram.status.toLowerCase()}`}>
-                {selectedProgram.status}
-              </span>
+            <div className="flex items-center justify-between pb-4" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+              <div className="flex items-center gap-2">
+                <div className="pulse-dot" />
+                <span className={`text-xs font-semibold uppercase px-2 py-0.5 rounded-full status-${selectedProgram.status.toLowerCase()}`}>
+                  {selectedProgram.status}
+                </span>
+              </div>
+              <button
+                onClick={() => setIsEditing(!isEditing)}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors"
+                style={{ background: isEditing ? 'var(--bg-elevated)' : 'transparent', color: isEditing ? 'var(--text-primary)' : 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}
+              >
+                {isEditing ? <><X size={14}/> Cancel</> : <><Edit3 size={14}/> Edit Program</>}
+              </button>
             </div>
 
-            {/* Quick info grid */}
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { label: 'UNIVERSITY', value: selectedProgram.university?.name },
-                { label: 'CITY', value: `${selectedProgram.university?.city}, ${selectedProgram.university?.province}` },
-                { label: 'PROGRAM', value: selectedProgram.title },
-                { label: 'DEGREE', value: selectedProgram.degree_level },
-                { label: 'FIELD', value: selectedProgram.field_of_study || 'Not specified' },
-                { label: 'INTAKE', value: selectedProgram.intake_season },
-                { label: 'DURATION', value: `${selectedProgram.duration_years} year${selectedProgram.duration_years !== 1 ? 's' : ''}` },
-                { label: 'CHINA RANKING', value: selectedProgram.university?.china_ranking ? `#${selectedProgram.university.china_ranking}` : 'Unranked' },
-                { label: 'LANGUAGE', value: selectedProgram.university?.instruction_languages?.join(', ') || 'Not specified' },
-                { label: 'SCHOLARSHIP', value: `${selectedProgram.scholarship_percentage}%` },
-              ].map((item) => (
-                <div key={item.label}>
-                  <span className="text-[10px] uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>{item.label}</span>
-                  <p className="text-sm font-medium mt-0.5" style={{ color: 'var(--text-primary)' }}>{item.value}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Financial summary */}
-            <div className="p-4 rounded-xl" style={{ background: 'var(--bg-card)' }}>
-              <h4 className="text-[10px] uppercase tracking-widest font-semibold mb-3" style={{ color: 'var(--text-muted)' }}>
-                Financial Summary
-              </h4>
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs">
-                  <span style={{ color: 'var(--text-secondary)' }}>Tuition</span>
-                  <span style={{ color: 'var(--text-primary)' }}>¥{selectedProgram.tuition_cny?.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span style={{ color: 'var(--text-secondary)' }}>Dorm Fee</span>
-                  <span style={{ color: 'var(--text-primary)' }}>¥{selectedProgram.dorm_fee_cny?.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span style={{ color: 'var(--text-secondary)' }}>Service Fee</span>
-                  <span style={{ color: 'var(--text-primary)' }}>¥{selectedProgram.service_fee_cny?.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-sm font-bold pt-2" style={{ borderTop: '1px solid var(--border-subtle)' }}>
-                  <span style={{ color: 'var(--text-primary)' }}>Total</span>
-                  <div className="text-right">
-                    <span style={{ color: 'var(--text-primary)' }}>¥{selectedProgram.total_fee_cny?.toLocaleString()}</span>
-                    <span className="block text-xs font-medium" style={{ color: 'var(--accent-green)' }}>≈ {selectedProgram.total_fee_mad?.toLocaleString()} MAD</span>
+            {isEditing ? (
+              <div className="space-y-4 animate-in fade-in">
+                <div className="space-y-3">
+                  <h4 className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: 'var(--text-muted)' }}>Program Details</h4>
+                  <input value={editForm.title || ''} onChange={(e) => handleEditChange('title', e.target.value)} placeholder="Program Title" className="input-field" />
+                  <div className="grid grid-cols-2 gap-3">
+                    <select value={editForm.degree_level || ''} onChange={(e) => handleEditChange('degree_level', e.target.value)} className="input-field">
+                      {DEGREE_LEVELS.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                    <input value={editForm.field_of_study || ''} onChange={(e) => handleEditChange('field_of_study', e.target.value)} placeholder="Field of Study" className="input-field" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <select value={editForm.intake_season || ''} onChange={(e) => handleEditChange('intake_season', e.target.value)} className="input-field">
+                      {INTAKE_SEASONS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                    <input type="number" step="0.5" value={editForm.duration_years || ''} onChange={(e) => handleEditChange('duration_years', Number(e.target.value))} placeholder="Duration (years)" className="input-field" />
                   </div>
                 </div>
-                {selectedProgram.scholarship_percentage > 0 && (
-                  <div className="mt-2 p-2 rounded-lg text-center" style={{ background: 'var(--badge-bg)' }}>
-                    <span className="text-xs font-bold" style={{ color: 'var(--badge-text)' }}>
-                      {selectedProgram.scholarship_percentage}% Scholarship Coverage
-                    </span>
+
+                <div className="space-y-3 pt-2">
+                  <h4 className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: 'var(--text-muted)' }}>Financial & Requirements</h4>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <span className="text-[10px] block mb-1">Tuition CNY</span>
+                      <input type="number" value={editForm.tuition_cny || 0} onChange={(e) => handleEditChange('tuition_cny', Number(e.target.value))} className="input-field" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] block mb-1">Dorm CNY</span>
+                      <input type="number" value={editForm.dorm_fee_cny || 0} onChange={(e) => handleEditChange('dorm_fee_cny', Number(e.target.value))} className="input-field" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] block mb-1">Service CNY</span>
+                      <input type="number" value={editForm.service_fee_cny || 0} onChange={(e) => handleEditChange('service_fee_cny', Number(e.target.value))} className="input-field" />
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-[10px] block mb-1">Scholarship %</span>
+                    <input type="number" value={editForm.scholarship_percentage || 0} onChange={(e) => handleEditChange('scholarship_percentage', Number(e.target.value))} className="input-field" />
+                  </div>
+                  <textarea value={editForm.requirements || ''} onChange={(e) => handleEditChange('requirements', e.target.value)} placeholder="Requirements" className="input-field min-h-[60px]" />
+                </div>
+                
+                <button onClick={saveProgramEdits} disabled={savingEdit} className="gradient-btn w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 mt-4">
+                  {savingEdit ? 'Saving...' : <><Save size={16} /> Save Changes</>}
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-4 animate-in fade-in">
+                  {[
+                    { label: 'UNIVERSITY', value: selectedProgram.university?.name },
+                    { label: 'CITY', value: `${selectedProgram.university?.city}, ${selectedProgram.university?.province}` },
+                    { label: 'PROGRAM', value: selectedProgram.title },
+                    { label: 'DEGREE', value: selectedProgram.degree_level },
+                    { label: 'FIELD', value: selectedProgram.field_of_study || 'Not specified' },
+                    { label: 'INTAKE', value: selectedProgram.intake_season },
+                    { label: 'DURATION', value: `${selectedProgram.duration_years} year${selectedProgram.duration_years !== 1 ? 's' : ''}` },
+                    { label: 'CHINA RANKING', value: selectedProgram.university?.china_ranking ? `#${selectedProgram.university.china_ranking}` : 'Unranked' },
+                    { label: 'LANGUAGE', value: selectedProgram.university?.instruction_languages?.join(', ') || 'Not specified' },
+                    { label: 'SCHOLARSHIP', value: `${selectedProgram.scholarship_percentage}%` },
+                  ].map((item) => (
+                    <div key={item.label}>
+                      <span className="text-[10px] uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>{item.label}</span>
+                      <p className="text-sm font-medium mt-0.5" style={{ color: 'var(--text-primary)' }}>{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Financial summary */}
+                <div className="p-4 rounded-xl" style={{ background: 'var(--bg-card)' }}>
+                  <h4 className="text-[10px] uppercase tracking-widest font-semibold mb-3" style={{ color: 'var(--text-muted)' }}>
+                    Financial Summary
+                  </h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <span style={{ color: 'var(--text-secondary)' }}>Tuition</span>
+                      <span style={{ color: 'var(--text-primary)' }}>¥{selectedProgram.tuition_cny?.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span style={{ color: 'var(--text-secondary)' }}>Dorm Fee</span>
+                      <span style={{ color: 'var(--text-primary)' }}>¥{selectedProgram.dorm_fee_cny?.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span style={{ color: 'var(--text-secondary)' }}>Service Fee</span>
+                      <span style={{ color: 'var(--text-primary)' }}>¥{selectedProgram.service_fee_cny?.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-bold pt-2" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                      <span style={{ color: 'var(--text-primary)' }}>Total</span>
+                      <div className="text-right">
+                        <span style={{ color: 'var(--text-primary)' }}>¥{selectedProgram.total_fee_cny?.toLocaleString()}</span>
+                        <span className="block text-xs font-medium" style={{ color: 'var(--accent-green)' }}>≈ {selectedProgram.total_fee_mad?.toLocaleString()} MAD</span>
+                      </div>
+                    </div>
+                    {selectedProgram.scholarship_percentage > 0 && (
+                      <div className="mt-2 p-2 rounded-lg text-center" style={{ background: 'var(--badge-bg)' }}>
+                        <span className="text-xs font-bold" style={{ color: 'var(--badge-text)' }}>
+                          {selectedProgram.scholarship_percentage}% Scholarship Coverage
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Requirements */}
+                {selectedProgram.requirements && (
+                  <div>
+                    <h4 className="text-[10px] uppercase tracking-widest font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>
+                      Requirements
+                    </h4>
+                    <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                      {selectedProgram.requirements}
+                    </p>
                   </div>
                 )}
-              </div>
-            </div>
-
-            {/* Requirements */}
-            {selectedProgram.requirements && (
-              <div>
-                <h4 className="text-[10px] uppercase tracking-widest font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>
-                  Requirements
-                </h4>
-                <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                  {selectedProgram.requirements}
-                </p>
-              </div>
+              </>
             )}
 
             {/* Status change */}
-            <div>
-              <h4 className="text-[10px] uppercase tracking-widest font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>
-                Update Status
-              </h4>
-              <div className="flex gap-2 flex-wrap">
-                {['Available', 'Expired', 'Full'].map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => updateProgramStatus(selectedProgram.id, s)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all status-${s.toLowerCase()}`}
-                    style={{
-                      outline: selectedProgram.status === s ? '2px solid var(--accent-primary)' : 'none',
-                      outlineOffset: '2px',
-                    }}
-                  >
-                    {s}
-                  </button>
-                ))}
+            {!isEditing && (
+              <div>
+                <h4 className="text-[10px] uppercase tracking-widest font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>
+                  Update Status
+                </h4>
+                <div className="flex gap-2 flex-wrap">
+                  {['Available', 'Expired', 'Full'].map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => updateProgramStatus(selectedProgram.id, s)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all status-${s.toLowerCase()}`}
+                      style={{
+                        outline: selectedProgram.status === s ? '2px solid var(--accent-primary)' : 'none',
+                        outlineOffset: '2px',
+                      }}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Actions */}
             <div className="flex items-center gap-3 pt-4" style={{ borderTop: '1px solid var(--border-subtle)' }}>
               <button
                 onClick={() => deleteProgram(selectedProgram.id)}
-                className="px-4 py-2 rounded-xl text-xs font-medium flex items-center gap-1.5"
+                className="px-4 py-2 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-colors hover:bg-red-500/10"
                 style={{ color: 'var(--accent-red)' }}
               >
                 <Trash2 size={14} /> Delete Offer
