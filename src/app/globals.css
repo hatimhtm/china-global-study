@@ -122,27 +122,29 @@
 /* ═══════════════════════════════════════
    FORM INPUTS — INCLUDING SELECTS
    ═══════════════════════════════════════ */
-.input-field {
-  background: var(--bg-input);
-  color: var(--text-primary);
-  border: 1px solid var(--border-subtle);
-  border-radius: 0.625rem;
-  padding: 0.625rem 0.875rem;
-  font-size: 0.8125rem;
-  font-family: inherit;
-  line-height: 1.5;
-  transition: border-color 200ms ease, box-shadow 200ms ease;
-  outline: none;
-  width: 100%;
-}
+@layer components {
+  .input-field {
+    background: var(--bg-input);
+    color: var(--text-primary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 0.625rem;
+    padding: 0.625rem 0.875rem;
+    font-size: 0.8125rem;
+    font-family: inherit;
+    line-height: 1.5;
+    transition: border-color 200ms ease, box-shadow 200ms ease;
+    outline: none;
+    width: 100%;
+  }
 
-.input-field:focus {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(198, 198, 199, 0.08);
-}
+  .input-field:focus {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(198, 198, 199, 0.08);
+  }
 
-.input-field::placeholder {
-  color: var(--text-muted);
+  .input-field::placeholder {
+    color: var(--text-muted);
+  }
 }
 
 /* Fix native select elements — CRITICAL for dark mode */
@@ -182,6 +184,7 @@ input[type="number"]::-webkit-outer-spin-button {
 
 input[type="number"] {
   -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 /* Fix date inputs */
@@ -309,6 +312,7 @@ table td {
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -316,6 +320,7 @@ table td {
 .line-clamp-3 {
   display: -webkit-box;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
