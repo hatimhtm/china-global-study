@@ -1,14 +1,15 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { supabase } from '@/lib/supabase';
 import { Application, Applicant, Program, University } from '@/types';
 import { APPLICATION_STATUSES, PRIORITY_OPTIONS } from '@/lib/constants';
 import Modal from '@/components/ui/Modal';
 import SlideDrawer from '@/components/ui/SlideDrawer';
 import {
-  LayoutGrid, List, Plus, Search, User, GraduationCap, ChevronRight, GripVertical, Trash2
+  LayoutGrid, List, Plus, Search, User, ChevronRight, Trash2
 } from 'lucide-react';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -23,6 +24,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function PipelinePage() {
+  const [isBrowser, setIsBrowser] = useState(false);
   const [applications, setApplications] = useState<Application[]>([]);
   const [applicants, setApplicants] = useState<Applicant[]>([]);
   const [programs, setPrograms] = useState<(Program & { university?: University })[]>([]);
@@ -32,7 +34,7 @@ export default function PipelinePage() {
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  // New application/applicant form
+  // New application form
   const [newApplicantName, setNewApplicantName] = useState('');
   const [newApplicantEmail, setNewApplicantEmail] = useState('');
   const [newApplicantPhone, setNewApplicantPhone] = useState('');
@@ -44,6 +46,9 @@ export default function PipelinePage() {
   const [programSearch, setProgramSearch] = useState('');
   const [selectedApplicantId, setSelectedApplicantId] = useState('');
   const [isNewApplicant, setIsNewApplicant] = useState(true);
+
+  // Mount check for DnD
+  useEffect(() => { setIsBrowser(true); }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -75,7 +80,19 @@ export default function PipelinePage() {
 
   const updateStatus = async (appId: string, status: string) => {
     await supabase.from('applications').update({ status, status_updated_at: new Date().toISOString() }).eq('id', appId);
-    fetchData();
+  };
+
+  const onDragEnd = async (result: DropResult) => {
+    const { destination, source, draggableId } = result;
+    if (!destination) return;
+    if (destination.droppableId === source.droppableId && destination.index === source.index) return;
+
+    // Optimistic UI update
+    const newStatus = destination.droppableId as Application['status'];
+    setApplications((prev) => prev.map(app => app.id === draggableId ? { ...app, status: newStatus } : app));
+
+    // Database update
+    await updateStatus(draggableId, newStatus);
   };
 
   const addApplication = async () => {
@@ -117,14 +134,8 @@ export default function PipelinePage() {
 
   const deleteApplication = async (appId: string, applicantId: string) => {
     if (!confirm('Are you sure you want to delete this application? \n\nClicking OK will permanently delete this student record.')) return;
-    
-    // As per user request, deleting the application shouldn't just delete the application,
-    // it should basically delete the student "so it is never brought up again".
-    // We start by deleting the applicant. Since foreign keys are defined typically with cascade or restrict,
-    // explicitly deleting both is safer. First applications, then applicant.
     await supabase.from('applications').delete().eq('id', appId);
     await supabase.from('applicants').delete().eq('id', applicantId);
-    
     setDrawerOpen(false);
     setSelectedApp(null);
     fetchData();
@@ -151,10 +162,10 @@ export default function PipelinePage() {
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center rounded-xl overflow-hidden" style={{ background: 'var(--bg-card)' }}>
-            <button onClick={() => setView('kanban')} className="px-4 py-2 text-xs font-medium flex items-center gap-1.5" style={{ background: view === 'kanban' ? 'var(--accent-primary)' : 'transparent', color: view === 'kanban' ? 'var(--text-inverse)' : 'var(--text-secondary)' }}>
+            <button onClick={() => setView('kanban')} className="px-4 py-2 text-xs font-medium flex items-center gap-1.5 transition-colors" style={{ background: view === 'kanban' ? 'var(--accent-primary)' : 'transparent', color: view === 'kanban' ? 'var(--text-inverse)' : 'var(--text-secondary)' }}>
               <LayoutGrid size={14} /> Kanban
             </button>
-            <button onClick={() => setView('list')} className="px-4 py-2 text-xs font-medium flex items-center gap-1.5" style={{ background: view === 'list' ? 'var(--accent-primary)' : 'transparent', color: view === 'list' ? 'var(--text-inverse)' : 'var(--text-secondary)' }}>
+            <button onClick={() => setView('list')} className="px-4 py-2 text-xs font-medium flex items-center gap-1.5 transition-colors" style={{ background: view === 'list' ? 'var(--accent-primary)' : 'transparent', color: view === 'list' ? 'var(--text-inverse)' : 'var(--text-secondary)' }}>
               <List size={14} /> List
             </button>
           </div>
@@ -169,55 +180,84 @@ export default function PipelinePage() {
           <div className="w-8 h-8 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--accent-primary)', borderTopColor: 'transparent' }} />
         </div>
       ) : view === 'kanban' ? (
-        /* ===== KANBAN ===== */
-        // Stretch the min-height to fill remaining vertical window height space
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {APPLICATION_STATUSES.map((status) => {
-            const items = applications.filter((a) => a.status === status);
-            return (
-              <div key={status} className="min-w-[280px] flex-shrink-0">
-                <div className="flex items-center gap-2 mb-3 px-1">
-                  <div className="w-2 h-2 rounded-full" style={{ background: STATUS_COLORS[status] }} />
-                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>{status}</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full ml-auto" style={{ background: 'var(--bg-elevated)', color: 'var(--text-muted)' }}>
-                    {items.length}
-                  </span>
-                </div>
-                <div className="space-y-2 min-h-[calc(100vh-220px)] p-2 rounded-xl" style={{ background: 'var(--bg-secondary)', border: '1px dashed var(--border-subtle)' }}>
-                  {items.map((app) => (
-                    <motion.div
-                      key={app.id}
-                      layout
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      onClick={() => openDrawer(app)}
-                      className="surface-card p-3 cursor-pointer group"
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <User size={12} style={{ color: 'var(--accent-primary)' }} />
-                        <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
-                          {app.applicant?.full_name || 'Unknown'}
-                        </span>
+        /* ===== KANBAN (DRAG AND DROP) ===== */
+        isBrowser && (
+          <DragDropContext onDragEnd={onDragEnd}>
+            <div className="flex gap-4 overflow-x-auto pb-4">
+              {APPLICATION_STATUSES.map((status) => {
+                const items = applications.filter((a) => a.status === status);
+                return (
+                  <Droppable key={status} droppableId={status}>
+                    {(provided, snapshot) => (
+                      <div className="min-w-[280px] flex-shrink-0 flex flex-col">
+                        
+                        {/* Column Header */}
+                        <div className="flex items-center gap-2 mb-3 px-1">
+                          <div className="w-2 h-2 rounded-full" style={{ background: STATUS_COLORS[status] }} />
+                          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>{status}</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full ml-auto" style={{ background: 'var(--bg-elevated)', color: 'var(--text-muted)' }}>
+                            {items.length}
+                          </span>
+                        </div>
+                        
+                        {/* Droppable Area */}
+                        <div
+                          {...provided.droppableProps}
+                          ref={provided.innerRef}
+                          className="flex-1 min-h-[calc(100vh-220px)] p-2 rounded-xl transition-colors"
+                          style={{ 
+                            background: snapshot.isDraggingOver ? 'var(--bg-elevated)' : 'var(--bg-secondary)',
+                            border: '1px dashed var(--border-subtle)'
+                          }}
+                        >
+                          {items.map((app, index) => (
+                            <Draggable key={app.id} draggableId={app.id} index={index}>
+                              {(provided, snapshot) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  onClick={() => openDrawer(app)}
+                                  className="surface-card p-3 mb-2 cursor-grab group transition-shadow"
+                                  style={{
+                                    ...provided.draggableProps.style,
+                                    boxShadow: snapshot.isDragging ? '0 12px 24px rgba(0,0,0,0.5)' : undefined,
+                                    transform: snapshot.isDragging ? `${provided.draggableProps.style?.transform} scale(1.02)` : provided.draggableProps.style?.transform,
+                                    zIndex: snapshot.isDragging ? 50 : 1,
+                                  }}
+                                >
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <User size={12} style={{ color: 'var(--accent-primary)' }} />
+                                    <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
+                                      {app.applicant?.full_name || 'Unknown'}
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] mb-2" style={{ color: 'var(--text-secondary)' }}>
+                                    {app.program?.title || app.custom_program || 'No program'}
+                                  </p>
+                                  <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                                    {app.program?.university?.name || app.custom_university || ''}
+                                  </p>
+                                  <div className="flex items-center justify-between mt-2">
+                                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full priority-${app.priority.toLowerCase()}`}>
+                                      {app.priority}
+                                    </span>
+                                    <ChevronRight size={12} style={{ color: 'var(--text-muted)' }} />
+                                  </div>
+                                </div>
+                              )}
+                            </Draggable>
+                          ))}
+                          {provided.placeholder}
+                        </div>
                       </div>
-                      <p className="text-[10px] mb-2" style={{ color: 'var(--text-secondary)' }}>
-                        {app.program?.title || app.custom_program || 'No program'}
-                      </p>
-                      <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                        {app.program?.university?.name || app.custom_university || ''}
-                      </p>
-                      <div className="flex items-center justify-between mt-2">
-                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full priority-${app.priority.toLowerCase()}`}>
-                          {app.priority}
-                        </span>
-                        <ChevronRight size={12} style={{ color: 'var(--text-muted)' }} className="group-hover:translate-x-1 transition-transform" />
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                    )}
+                  </Droppable>
+                );
+              })}
+            </div>
+          </DragDropContext>
+        )
       ) : (
         /* ===== LIST VIEW ===== */
         <div className="surface-card overflow-hidden">
@@ -248,7 +288,7 @@ export default function PipelinePage() {
       {/* Add Application Modal */}
       <Modal isOpen={showAddModal} onClose={() => { setShowAddModal(false); resetForm(); }} title="New Application" subtitle="Assign a student to a program offer.">
         <div className="space-y-5">
-          {/* Applicant */}
+          {/* Form Content - Same as before */}
           <div>
             <div className="flex items-center gap-3 mb-2">
               <button onClick={() => setIsNewApplicant(true)} className="text-xs font-medium px-3 py-1 rounded-full transition-colors" style={{ background: isNewApplicant ? 'var(--accent-primary)' : 'var(--bg-card)', color: isNewApplicant ? 'var(--text-inverse)' : 'var(--text-secondary)' }}>
@@ -277,11 +317,10 @@ export default function PipelinePage() {
             )}
           </div>
 
-          {/* Program selection */}
-          <div className="p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)' }}>
+          <div>
             <label className="text-[10px] uppercase tracking-widest font-semibold mb-3 block" style={{ color: 'var(--text-muted)' }}>Program Allocation</label>
             {!isCustomUni ? (
-              <div className="space-y-3">
+              <div className="space-y-3 p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)' }}>
                 <div className="relative">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
                   <input value={programSearch} onChange={(e) => setProgramSearch(e.target.value)} placeholder="Type to search existing programs..." className="input-field pl-10" />
@@ -307,7 +346,7 @@ export default function PipelinePage() {
                 </button>
               </div>
             ) : (
-              <div className="space-y-3 p-3 rounded-lg" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-subtle)' }}>
+              <div className="space-y-3 p-4 rounded-xl" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-subtle)' }}>
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Non-Partnered Record</span>
                   <button type="button" onClick={() => setIsCustomUni(false)} className="text-xs transition-colors hover:text-red-400" style={{ color: 'var(--accent-red)' }}>Cancel</button>
@@ -362,7 +401,11 @@ export default function PipelinePage() {
                 {APPLICATION_STATUSES.map((s) => (
                   <button
                     key={s}
-                    onClick={() => updateStatus(selectedApp.id, s)}
+                    onClick={() => {
+                      updateStatus(selectedApp.id, s);
+                      setApplications(prev => prev.map(a => a.id === selectedApp.id ? { ...a, status: s as Application['status'] } : a));
+                      setSelectedApp({ ...selectedApp, status: s as Application['status'] });
+                    }}
                     className="px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all hover:scale-105"
                     style={{
                       background: `${STATUS_COLORS[s]}20`,
@@ -385,7 +428,7 @@ export default function PipelinePage() {
                     key={pr}
                     onClick={async () => {
                       await supabase.from('applications').update({ priority: pr }).eq('id', selectedApp.id);
-                      fetchData();
+                      setApplications(prev => prev.map(a => a.id === selectedApp.id ? { ...a, priority: pr } : a));
                       setSelectedApp({ ...selectedApp, priority: pr });
                     }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105 priority-${pr.toLowerCase()}`}
@@ -400,7 +443,6 @@ export default function PipelinePage() {
               </div>
             </div>
             
-            {/* Actions */}
             <div className="pt-6 mt-4" style={{ borderTop: '1px solid var(--border-subtle)' }}>
                <button
                   onClick={() => deleteApplication(selectedApp.id, selectedApp.applicant_id)}
