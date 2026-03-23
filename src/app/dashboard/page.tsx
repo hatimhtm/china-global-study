@@ -104,8 +104,8 @@ export default function DashboardPage() {
     if (!selectedProgram) return;
     setSavingEdit(true);
     
-    // Auto calculate totals
-    const totalCny = (Number(editForm.tuition_cny) || 0) + (Number(editForm.dorm_fee_cny) || 0) + (Number(editForm.service_fee_cny) || 0);
+    // Auto calculate totals (excluding service fee which goes to agency)
+    const totalCny = (Number(editForm.tuition_cny) || 0) + (Number(editForm.dorm_fee_cny) || 0);
     const totalMad = Math.round(totalCny * DEFAULT_MAD_RATE * 100) / 100;
 
     const updates = {

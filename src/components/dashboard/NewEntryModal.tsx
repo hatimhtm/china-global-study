@@ -59,7 +59,8 @@ export default function NewEntryModal({ isOpen, onClose, onSaved }: NewEntryModa
     }
   };
 
-  const totalCny = (Number(tuitionCny) || 0) + (Number(dormFeeCny) || 0) + (Number(serviceFeeCny) || 0);
+  // Total fee now only includes tuition and dorm (university price). Service fee goes to the agency.
+  const totalCny = (Number(tuitionCny) || 0) + (Number(dormFeeCny) || 0);
   const totalMad = Math.round(totalCny * DEFAULT_MAD_RATE * 100) / 100;
 
   const resetForm = () => {

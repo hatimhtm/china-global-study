@@ -37,6 +37,7 @@ export default function PipelinePage() {
   const [editAppForm, setEditAppForm] = useState<Partial<Applicant>>({});
   const [isEditingPayment, setIsEditingPayment] = useState(false);
   const [addPaymentAmount, setAddPaymentAmount] = useState<number | ''>('');
+  const [forcePaid, setForcePaid] = useState(false);
 
   // New application form
   const [newApplicantName, setNewApplicantName] = useState('');
@@ -162,6 +163,7 @@ export default function PipelinePage() {
     setIsEditingApp(false);
     setIsEditingPayment(false);
     setAddPaymentAmount('');
+    setForcePaid(false);
     setDrawerOpen(true);
   };
 
@@ -169,19 +171,23 @@ export default function PipelinePage() {
     if (!selectedApp) return;
     
     const amountToAdd = Number(addPaymentAmount) || 0;
-    if (amountToAdd <= 0) {
+    if (amountToAdd <= 0 && !forcePaid) {
       setIsEditingPayment(false);
       return;
     }
 
     const currentPaid = selectedApp.amount_paid_cny || 0;
-    const totalFee = selectedApp.program?.total_fee_cny || 0;
+    const feeToCompare = selectedApp.program?.service_fee_cny || 0;
     const newTotal = currentPaid + amountToAdd;
     
     let newStatus = 'Unpaid';
-    if (newTotal > 0 && newTotal < totalFee) newStatus = 'Partial';
-    if (newTotal >= totalFee && totalFee > 0) newStatus = 'Paid';
-    if (newTotal > 0 && totalFee === 0) newStatus = 'Paid';
+    if (forcePaid) {
+      newStatus = 'Paid';
+    } else {
+      if (newTotal > 0 && newTotal < feeToCompare) newStatus = 'Partial';
+      if (newTotal >= feeToCompare && feeToCompare > 0) newStatus = 'Paid';
+      if (newTotal > 0 && feeToCompare === 0) newStatus = 'Paid';
+    }
     
     await supabase.from('applications').update({
       payment_status: newStatus,
@@ -194,6 +200,7 @@ export default function PipelinePage() {
     setSelectedApp(updatedApp);
     setIsEditingPayment(false);
     setAddPaymentAmount('');
+    setForcePaid(false);
   };
 
   const saveAppEdits = async () => {
@@ -500,23 +507,31 @@ export default function PipelinePage() {
                       type="number" 
                       value={addPaymentAmount} 
                       onChange={(e) => setAddPaymentAmount(parseInt(e.target.value) || '')}
-                      className="input-field" 
+                      className="input-field mb-3" 
                       placeholder="Amount to add to current balance (e.g. 500)" 
                     />
                   </div>
-                  <button onClick={savePayment} disabled={!addPaymentAmount} className="gradient-btn w-full py-2 rounded-lg text-xs font-semibold mt-2 disabled:opacity-50">
-                    Add Payment
+                  <label className="flex items-center gap-2 cursor-pointer pb-2" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                    <input
+                      type="checkbox"
+                      checked={forcePaid}
+                      onChange={(e) => setForcePaid(e.target.checked)}
+                    />
+                    <span className="text-xs" style={{ color: 'var(--text-primary)' }}>Force "Paid" Status (Offer/Discount)</span>
+                  </label>
+                  <button onClick={savePayment} disabled={!addPaymentAmount && !forcePaid} className="gradient-btn w-full py-2 rounded-lg text-xs font-semibold mt-2 disabled:opacity-50">
+                    {forcePaid ? 'Mark as Paid' : 'Add Payment'}
                   </button>
                 </div>
               ) : (() => {
-                const totalFee = selectedApp.program?.total_fee_cny || 0;
+                const feeToCompare = selectedApp.program?.service_fee_cny || 0;
                 const paid = selectedApp.amount_paid_cny || 0;
-                const left = Math.max(0, totalFee - paid);
+                const pStatus = selectedApp.payment_status || 'Unpaid';
+                const left = pStatus === 'Paid' ? 0 : Math.max(0, feeToCompare - paid);
                 const leftMad = Math.round(left * DEFAULT_MAD_RATE);
                 
                 const bgMap = { Unpaid: 'rgba(248, 113, 113, 0.12)', Partial: 'rgba(251, 191, 36, 0.12)', Paid: 'rgba(52, 211, 153, 0.12)' };
                 const colorMap = { Unpaid: '#f87171', Partial: '#fbbf24', Paid: '#34d399' };
-                const pStatus = selectedApp.payment_status || 'Unpaid';
                 
                 return (
                   <div className="space-y-3 animate-in fade-in">
@@ -531,20 +546,20 @@ export default function PipelinePage() {
                        </div>
                     </div>
                     
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 gap-2 mt-3">
                       <div className="p-3 rounded-xl text-center" style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-card)' }}>
-                        <p className="text-[10px] uppercase font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Total Fee</p>
-                        <p className="text-sm font-bold truncate">¥{totalFee.toLocaleString()}</p>
+                        <p className="text-[10px] uppercase font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Service Fee</p>
+                        <p className="text-sm font-bold truncate">¥{feeToCompare.toLocaleString()}</p>
                       </div>
                       <div className="p-3 rounded-xl text-center" style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-card)' }}>
                         <p className="text-[10px] uppercase font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Paid</p>
                         <p className="text-sm font-bold truncate" style={{ color: colorMap[pStatus as 'Unpaid' | 'Partial' | 'Paid'] }}>¥{paid.toLocaleString()}</p>
                       </div>
-                      <div className="p-3 rounded-xl text-center relative overflow-hidden" style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-hover)' }}>
-                        <p className="text-[10px] uppercase font-semibold mb-1 relative z-10" style={{ color: 'var(--accent-red)' }}>Amount Left</p>
-                        <p className="text-[13px] font-bold truncate relative z-10 leading-none mb-0.5" style={{ color: 'var(--text-primary)' }}>¥{left.toLocaleString()}</p>
-                        <p className="text-[9px] font-medium opacity-80 relative z-10" style={{ color: 'var(--text-muted)' }}>~{leftMad.toLocaleString()} MAD</p>
-                      </div>
+                    </div>
+                    <div className="p-3 mt-2 rounded-xl text-center relative overflow-hidden" style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-hover)' }}>
+                      <p className="text-[10px] uppercase font-semibold mb-1 relative z-10" style={{ color: 'var(--accent-red)' }}>Amount Left</p>
+                      <p className="text-[13px] font-bold truncate relative z-10 leading-none mb-0.5" style={{ color: 'var(--text-primary)' }}>¥{left.toLocaleString()}</p>
+                      <p className="text-[9px] font-medium opacity-80 relative z-10" style={{ color: 'var(--text-muted)' }}>~{leftMad.toLocaleString()} MAD</p>
                     </div>
                   </div>
                 );
