@@ -5,6 +5,8 @@ import { motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { University, Program } from '@/types';
 import SlideDrawer from '@/components/ui/SlideDrawer';
+import EmptyState from '@/components/ui/EmptyState';
+import { GridSkeleton } from '@/components/ui/Skeleton';
 import {
   GraduationCap, MapPin, Star, Search, Edit3, Trash2, Save, X, GitCompare, ChevronRight,
 } from 'lucide-react';
@@ -134,9 +136,13 @@ export default function UniversitiesPage() {
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--accent-primary)', borderTopColor: 'transparent' }} />
-        </div>
+        <GridSkeleton count={6} columns={3} />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          icon={<GraduationCap size={22} />}
+          title={universities.length === 0 ? 'No universities yet' : 'No matches'}
+          description={universities.length === 0 ? 'Add partnered Chinese universities here to attach programs to them later.' : 'Try clearing the search to see the full registry.'}
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((uni, i) => (

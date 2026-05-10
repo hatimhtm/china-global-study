@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase';
 import { Task, Applicant } from '@/types';
 import { TASK_CATEGORIES, PRIORITY_OPTIONS } from '@/lib/constants';
 import Modal from '@/components/ui/Modal';
+import EmptyState from '@/components/ui/EmptyState';
+import { TableSkeleton } from '@/components/ui/Skeleton';
 import {
   CheckSquare, Square, Plus, Tag, Calendar, Filter, Trash2, GripVertical,
 } from 'lucide-react';
@@ -122,14 +124,13 @@ export default function TasksPage() {
 
       {/* Tasks list */}
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--accent-primary)', borderTopColor: 'transparent' }} />
-        </div>
+        <TableSkeleton rows={5} />
       ) : filtered.length === 0 ? (
-        <div className="text-center py-20">
-          <CheckSquare size={48} className="mx-auto mb-4" style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No tasks yet. Create one to get started.</p>
-        </div>
+        <EmptyState
+          icon={<CheckSquare size={22} />}
+          title={tasks.length === 0 ? 'No tasks yet' : 'Nothing in this view'}
+          description={tasks.length === 0 ? 'Create your first task — pre-departure, arrival, documentation, or general.' : 'Try a different category or clear the applicant filter.'}
+        />
       ) : (
         <div className="space-y-2">
           {filtered.map((task, i) => (

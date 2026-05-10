@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
+const AUTH_PHRASE = process.env.NEXT_PUBLIC_AUTH_PHRASE;
+
 export default function AuthGate() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(false);
@@ -24,7 +26,7 @@ export default function AuthGate() {
     setError(false);
 
     setTimeout(() => {
-      if (password === 'kamal is stupid') {
+      if (AUTH_PHRASE && password === AUTH_PHRASE) {
         localStorage.setItem('cgs_authenticated', 'true');
         router.push('/dashboard');
       } else {

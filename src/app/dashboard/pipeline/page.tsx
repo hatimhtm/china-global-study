@@ -8,8 +8,10 @@ import { Application, Applicant, Program, University } from '@/types';
 import { APPLICATION_STATUSES, PRIORITY_OPTIONS, DEFAULT_MAD_RATE } from '@/lib/constants';
 import Modal from '@/components/ui/Modal';
 import SlideDrawer from '@/components/ui/SlideDrawer';
+import EmptyState from '@/components/ui/EmptyState';
+import { KanbanSkeleton } from '@/components/ui/Skeleton';
 import {
-  LayoutGrid, List, Plus, Search, User, ChevronRight, Trash2, Edit3, X, Save
+  LayoutGrid, List, Plus, Search, User, ChevronRight, Trash2, Edit3, X, Save, Inbox
 } from 'lucide-react';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -22,6 +24,11 @@ const STATUS_COLORS: Record<string, string> = {
   'Enrolled': 'var(--accent-green)',
   'Rejected': 'var(--accent-red)',
 };
+
+const paymentClass = (status: string | null | undefined) =>
+  status === 'Paid' ? 'payment-paid' : status === 'Partial' ? 'payment-partial' : 'payment-unpaid';
+const paymentAccent = (status: string | null | undefined) =>
+  status === 'Paid' ? 'var(--accent-green)' : status === 'Partial' ? 'var(--accent-amber)' : 'var(--accent-red)';
 
 export default function PipelinePage() {
   const [isBrowser, setIsBrowser] = useState(false);
@@ -245,9 +252,18 @@ export default function PipelinePage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--accent-primary)', borderTopColor: 'transparent' }} />
-        </div>
+        <KanbanSkeleton />
+      ) : applications.length === 0 ? (
+        <EmptyState
+          icon={<Inbox size={22} />}
+          title="No applications yet"
+          description="Add your first applicant to see them move through the eight-stage pipeline."
+          action={
+            <button onClick={() => setShowAddModal(true)} className="gradient-btn px-4 py-2 rounded-xl text-xs font-medium flex items-center gap-1.5">
+              <Plus size={14} /> New Application
+            </button>
+          }
+        />
       ) : view === 'kanban' ? (
         /* ===== KANBAN (DRAG AND DROP) ===== */
         isBrowser && (
@@ -308,7 +324,7 @@ export default function PipelinePage() {
                                     {app.program?.university?.name || app.custom_university || ''}
                                   </p>
                                   <div className="flex items-center justify-between mt-2">
-                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: app.payment_status === 'Paid' ? 'rgba(52, 211, 153, 0.12)' : app.payment_status === 'Partial' ? 'rgba(251, 191, 36, 0.12)' : 'rgba(248, 113, 113, 0.12)', color: app.payment_status === 'Paid' ? '#34d399' : app.payment_status === 'Partial' ? '#fbbf24' : '#f87171' }}>
+                                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${paymentClass(app.payment_status)}`}>
                                       {app.payment_status || 'Unpaid'}
                                     </span>
                                     <ChevronRight size={12} style={{ color: 'var(--text-muted)' }} />
@@ -345,7 +361,7 @@ export default function PipelinePage() {
                   <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-secondary)' }}>{app.program?.title || app.custom_program || '—'}</td>
                   <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-secondary)' }}>{app.program?.university?.name || app.custom_university || '—'}</td>
                   <td className="px-4 py-3"><span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: `${STATUS_COLORS[app.status]}20`, color: STATUS_COLORS[app.status] }}>{app.status}</span></td>
-                  <td className="px-4 py-3"><span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: app.payment_status === 'Paid' ? 'rgba(52, 211, 153, 0.12)' : app.payment_status === 'Partial' ? 'rgba(251, 191, 36, 0.12)' : 'rgba(248, 113, 113, 0.12)', color: app.payment_status === 'Paid' ? '#34d399' : app.payment_status === 'Partial' ? '#fbbf24' : '#f87171' }}>{app.payment_status || 'Unpaid'}</span></td>
+                  <td className="px-4 py-3"><span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${paymentClass(app.payment_status)}`}>{app.payment_status || 'Unpaid'}</span></td>
                   <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-muted)' }}>{new Date(app.created_at).toLocaleDateString()}</td>
                 </tr>
               ))}
@@ -530,9 +546,6 @@ export default function PipelinePage() {
                 const left = pStatus === 'Paid' ? 0 : Math.max(0, feeToCompare - paid);
                 const leftMad = Math.round(left * DEFAULT_MAD_RATE);
                 
-                const bgMap = { Unpaid: 'rgba(248, 113, 113, 0.12)', Partial: 'rgba(251, 191, 36, 0.12)', Paid: 'rgba(52, 211, 153, 0.12)' };
-                const colorMap = { Unpaid: '#f87171', Partial: '#fbbf24', Paid: '#34d399' };
-                
                 return (
                   <div className="space-y-3 animate-in fade-in">
                     <div className="flex items-center justify-between p-3 rounded-xl" style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-card)' }}>
@@ -540,12 +553,12 @@ export default function PipelinePage() {
                          <span className="text-[10px] uppercase font-bold tracking-wider" style={{ color: 'var(--text-muted)' }}>Status</span>
                        </div>
                        <div>
-                         <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: bgMap[pStatus as 'Unpaid' | 'Partial' | 'Paid'], color: colorMap[pStatus as 'Unpaid' | 'Partial' | 'Paid'] }}>
+                         <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${paymentClass(pStatus)}`}>
                            {pStatus}
                          </span>
                        </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-2 mt-3">
                       <div className="p-3 rounded-xl text-center" style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-card)' }}>
                         <p className="text-[10px] uppercase font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Service Fee</p>
@@ -553,7 +566,7 @@ export default function PipelinePage() {
                       </div>
                       <div className="p-3 rounded-xl text-center" style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-card)' }}>
                         <p className="text-[10px] uppercase font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Paid</p>
-                        <p className="text-sm font-bold truncate" style={{ color: colorMap[pStatus as 'Unpaid' | 'Partial' | 'Paid'] }}>¥{paid.toLocaleString()}</p>
+                        <p className="text-sm font-bold truncate" style={{ color: paymentAccent(pStatus) }}>¥{paid.toLocaleString()}</p>
                       </div>
                     </div>
                     <div className="p-3 mt-2 rounded-xl text-center relative overflow-hidden" style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-hover)' }}>

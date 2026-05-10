@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase';
 import { CityGuide } from '@/types';
 import { CITY_GUIDES_SEED } from '@/lib/constants';
 import SlideDrawer from '@/components/ui/SlideDrawer';
+import EmptyState from '@/components/ui/EmptyState';
+import { GridSkeleton } from '@/components/ui/Skeleton';
 import {
   MapPin, Edit3, Save, X, Smartphone, Home, Bus, Utensils, Cloud, DollarSign, Users,
 } from 'lucide-react';
@@ -62,9 +64,13 @@ export default function CitiesPage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--accent-primary)', borderTopColor: 'transparent' }} />
-        </div>
+        <GridSkeleton count={6} columns={3} />
+      ) : cities.length === 0 ? (
+        <EmptyState
+          icon={<MapPin size={22} />}
+          title="No city guides yet"
+          description="City guides will populate automatically the first time the page loads. If you see this, something blocked the seed insert — check your Supabase logs."
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {cities.map((city, i) => (

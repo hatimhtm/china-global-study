@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase';
 import { Document, Application, Applicant } from '@/types';
 import { DOCUMENT_TYPES } from '@/lib/constants';
 import Modal from '@/components/ui/Modal';
+import EmptyState from '@/components/ui/EmptyState';
+import { CardSkeleton } from '@/components/ui/Skeleton';
 import {
   FileText, User, Search, Plus, Filter, CheckCircle, Clock, AlertCircle, XCircle, Trash2
 } from 'lucide-react';
@@ -122,14 +124,13 @@ export default function DocumentsPage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--accent-primary)', borderTopColor: 'transparent' }} />
-        </div>
+        <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <CardSkeleton key={i} />)}</div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-20">
-          <FileText size={48} className="mx-auto mb-4" style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No documents yet.</p>
-        </div>
+        <EmptyState
+          icon={<FileText size={22} />}
+          title="No documents yet"
+          description="Documents are scoped to applications. Add an application in the pipeline first, then return here to track its document set."
+        />
       ) : (
         <div className="space-y-3">
           {/* Group by applicant */}

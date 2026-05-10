@@ -76,13 +76,17 @@
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: 1rem;
-  transition: background 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+  transition: background 220ms cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 220ms cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .surface-card:hover {
   background: var(--bg-hover);
   border-color: var(--border-medium);
-  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 24px -10px rgba(0, 0, 0, 0.25);
+  transform: translateY(-1px);
 }
 
 .surface-elevated {
@@ -99,17 +103,19 @@
   cursor: pointer;
   border: none;
   font-weight: 600;
-  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 200ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 160ms cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .gradient-btn:hover {
-  opacity: 0.9;
+  opacity: 0.92;
   transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(255, 255, 255, 0.1);
+  box-shadow: 0 6px 18px -8px rgba(0, 0, 0, 0.35);
 }
 
 .gradient-btn:active {
-  transform: translateY(0);
+  transform: scale(0.98) translateY(0);
 }
 
 .gradient-btn:disabled {
@@ -224,18 +230,23 @@ input[type="date"] {
 .fade-in { animation: fadeIn 0.3s ease-out; }
 
 /* ═══════════════════════════════════════
-   STATUS BADGES
+   STATUS BADGES — theme-aware via color-mix
    ═══════════════════════════════════════ */
-.status-available { background: rgba(52, 211, 153, 0.12); color: #34d399; }
-.status-expired { background: rgba(248, 113, 113, 0.12); color: #f87171; }
-.status-full { background: rgba(251, 191, 36, 0.12); color: #fbbf24; }
-.status-pending { background: rgba(251, 191, 36, 0.12); color: #fbbf24; }
-.status-received { background: rgba(96, 165, 250, 0.12); color: #60a5fa; }
-.status-verified { background: rgba(52, 211, 153, 0.12); color: #34d399; }
+.status-available,
+.status-verified,
+.payment-paid     { background: color-mix(in srgb, var(--accent-green) 12%, transparent); color: var(--accent-green); }
 
-.priority-high { background: rgba(248, 113, 113, 0.12); color: #f87171; }
-.priority-medium { background: rgba(251, 191, 36, 0.12); color: #fbbf24; }
-.priority-low { background: rgba(96, 165, 250, 0.12); color: #60a5fa; }
+.status-expired,
+.priority-high,
+.payment-unpaid   { background: color-mix(in srgb, var(--accent-red) 12%, transparent); color: var(--accent-red); }
+
+.status-full,
+.status-pending,
+.priority-medium,
+.payment-partial  { background: color-mix(in srgb, var(--accent-amber) 12%, transparent); color: var(--accent-amber); }
+
+.status-received,
+.priority-low     { background: color-mix(in srgb, var(--accent-blue) 12%, transparent); color: var(--accent-blue); }
 
 /* ═══════════════════════════════════════
    TUTORIAL

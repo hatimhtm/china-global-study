@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase';
 import { Program, University } from '@/types';
 import { DEFAULT_MAD_RATE, DEGREE_LEVELS, INTAKE_SEASONS } from '@/lib/constants';
 import SlideDrawer from '@/components/ui/SlideDrawer';
+import EmptyState from '@/components/ui/EmptyState';
+import { GridSkeleton } from '@/components/ui/Skeleton';
 import {
   LayoutGrid,
   List,
@@ -234,16 +236,13 @@ export default function DashboardPage() {
 
       {/* Content */}
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--accent-primary)', borderTopColor: 'transparent' }} />
-        </div>
+        <GridSkeleton count={8} columns={4} />
       ) : filteredPrograms.length === 0 ? (
-        <div className="text-center py-20">
-          <GraduationCap size={48} className="mx-auto mb-4" style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-            {programs.length === 0 ? 'No programs yet. Click "+ New Entry" to add your first offer.' : 'No programs match your filters.'}
-          </p>
-        </div>
+        <EmptyState
+          icon={<GraduationCap size={22} />}
+          title={programs.length === 0 ? 'No programs yet' : 'No programs match your filters'}
+          description={programs.length === 0 ? 'Add your first program offer to start tracking universities and intake seasons.' : 'Try clearing the search or filter chips to see everything.'}
+        />
       ) : view === 'cards' ? (
         /* ===== SIMPLIFIED: CARD GRID ===== */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
