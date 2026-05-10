@@ -533,7 +533,7 @@ export default function PipelinePage() {
                       checked={forcePaid}
                       onChange={(e) => setForcePaid(e.target.checked)}
                     />
-                    <span className="text-xs" style={{ color: 'var(--text-primary)' }}>Force "Paid" Status (Offer/Discount)</span>
+                    <span className="text-xs" style={{ color: 'var(--text-primary)' }}>Force &ldquo;Paid&rdquo; Status (Offer/Discount)</span>
                   </label>
                   <button onClick={savePayment} disabled={!addPaymentAmount && !forcePaid} className="gradient-btn w-full py-2 rounded-lg text-xs font-semibold mt-2 disabled:opacity-50">
                     {forcePaid ? 'Mark as Paid' : 'Add Payment'}

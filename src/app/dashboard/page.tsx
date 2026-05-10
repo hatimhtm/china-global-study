@@ -117,7 +117,7 @@ export default function DashboardPage() {
     };
 
     // Remove joined university data before saving
-    delete (updates as any).university;
+    delete (updates as Partial<Program> & { university?: unknown }).university;
 
     const { data, error } = await supabase
       .from('programs')
@@ -142,7 +142,7 @@ export default function DashboardPage() {
     fetchPrograms();
   };
 
-  const handleEditChange = (field: keyof Program, value: any) => {
+  const handleEditChange = (field: keyof Program, value: Program[keyof Program]) => {
     setEditForm((prev) => ({ ...prev, [field]: value }));
   };
 
